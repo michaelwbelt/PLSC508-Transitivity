@@ -1,7 +1,5 @@
 #
 library(network)
-library(igraph)
-library(intergraph)
 library(sna)
 #
 ############Edge Types & Transitivity Scores############
@@ -24,49 +22,48 @@ library(sna)
 #
 set.seed(12345)
 #
-# We’ll begin with a basic random graph using the sample_gnp function. 
-# Similar to the erdos.renyi.game function, sample_gnp takes a number of nodes, 
-# a probability of edges between arbitrary vertices, an argument for whether or not 
-# the graph is directed, and an argument for whether or not loops can exist within it. 
-# For ease of analysis, we’ll start with 10 nodes, and a probability of 0.3. 
-# Since transitivity requires direction, we’ll set this argument to TRUE.
+# We’ll begin with a basic random graph using the rgraph function in sna, nested within the network function. 
+# rgraph takes a number of nodes (n), a probability of edges between arbitrary vertices 
+# (either as a single statistic, a vector of multiple probabilities, a matrix, or a 3D array), 
+# an argument for whether or not the graph is directed (mode), and an argument for whether or not loops can exist within it (diag). 
+# 
+# For ease of analysis, we’ll start with 10 nodes, and a single probability of 0.3. 
+# Since transitivity requires direction, we’ll set this argument to digraph.
 #
-graph1 <- sample_gnp(10, 0.3, directed = TRUE)
+graph1 <- (rgraph(10, tprob = 0.3, mode = "digraph", return.as.edgelist = TRUE))
 #
-# From here, we can test for these three types of edges (mutual, asymmetric, and null) using dyad_census
+# For plotting, we will convert this to a network object.
+g1 <- network(graph1)
+plot.network(g1)
 #
-dyad_census(graph1)
+# From here, we can test for these three types of edges (mutual, asymmetric, and null) using dyad.census
+#
+dyad.census(graph1)
 #
 # It’s important to note here that null edges constitute a lack of edges between two given points 
 # throughout the entirety of the graph. This does not mean that these nodes lacking connections are isolates; 
 # rather, it indicates null edges between two particular nodes.
 #
-# Transvity is measured using the transitivity command. Here, we have a number of options. 
-# Inputting the graph and setting the level of analysis to global is the same as inputting the graph and foregoing a type. 
-# This gives you the degree of transitivity of the whole network, ranging from 0 (no transitivity) to 1 (full transitivity).
+# Transvity is measured using the gtrans command in sna. Here, we have a number of options. 
+# The gtrans function takes either one or a multitude of graphs (either directed or undirected),
+# an argument for reading loops (diag), an indicator of direction ("digraph" or "graph"), 
+# and a measure argument to determine which type of transitivity the function is to look for.
+# This function returns the fraction of triads that follow whichever specific "measure" argument is indicated.
 #
-transitivity(graph1, type = c(type = "global"))
-transitivity(graph1)
-#
-# Likewise, setting the type as undirected or globalundirected produce the exact same results.
+# For the measure argument, weak transitivity (denoted by "weak") corresponds to a unidirectional type of argument,
+# in which for nodes a,b, and c, a->b->c => a->c. For "strong", however, a->b->c <=> a->c, 
+# implying the opposite relationship as well. There are also arguments for "weakcensus" and "strongcensus",
+# which will return the number of total transitive triads in the network of each respective type.
 # 
-transitivity(graph1, type = c(type = "undirected"))
-transitivity(graph1, type = c(type = "globalundirected"))
+# It should be noted that when a strong argument is used, all triads are considered. 
+# This is because all triads in a network are at risk for intransitivity. The weak argument, by contrast,
+# only computes a transitivity score for the set of weak potentially-intransitive triads in the network.
 #
-# Adding a local modifier will give you transitivities of each particular node in the graph, as will localundirected.
-#
-transitivity(graph1, type = c(type = "local"))
-transitivity(graph1, type = c(type = "localundirected"))
-#
-# While barrat and weighted, identical modifiers, calculate weighted transitivities, 
-# we’re now going to turn to the vids argument, which can output transitivities for specific nodes. 
-# If vids is set to NULL, the function outputs all transitivities.
-#
-transitivity(graph2, type = c(type = "local"), vids=NULL)
-#
-#Let’s say, however, we want just to incorporate one node ID, such as node 11.
-#
-transitivity(graph2, type = c(type = "local"), vids=11)
+# Let's utilize each argument for our network.
+gtrans(graph1,mode="digraph",measure=c("weak"))
+gtrans(graph1,mode="digraph",measure=c("strong"))
+gtrans(graph1,mode="digraph",measure=c("weakcensus"))
+gtrans(graph1,mode="digraph",measure=c("strongcensus"))
 #
 # There are a number of other modifiers to this function, but for basic transitivity analysis, these will suffice.
 #
@@ -81,10 +78,6 @@ transitivity(graph2, type = c(type = "local"), vids=11)
 #
 # The sna package contains a function called rguman, which allows us to select either the probability of each dyad type 
 # or the number of occurrences. We shall create graphs for all six graphs with dyad restrictions, using both methods.
-#
-# First, we need to detach the igraph package, due to near-identical functions in both igraph and sna. We’ll bring it back in later.
-#
-detach(package:igraph, unload = T)
 #
 # We’ll begin with a completely connected graph. As these graphs only contain M-edges, 
 # we will indicate this dyad type, the number of graphs we want generated (1), 
@@ -127,38 +120,44 @@ po1 <- gplot(rguman(1,12,mut=0,asym=0.5,null=0.5, method=c("probability")))
 #
 po2 <- gplot(rguman(1,12,mut=0,asym=33,null=33,method="exact"))
 #
-# If necessary, one can use dyad.census (the SNA version) to calculate the exact number of dyads in the graphs.
+# If necessary, one can use dyad.census to calculate the exact number of dyads in the graphs.
 #
-dyad.census(cc1)
+dyad.census(qs1)
 #
-# Or one can calculate transitivity scores (if they loaded in the igraph package again).
+# Or one can calculate transitivity scores if they so desire.
+gtrans(qs1,mode="digraph",measure=c("weak"))
+gtrans(qs1,mode="digraph",measure=c("strong"))
+gtrans(qs1,mode="digraph",measure=c("weakcensus"))
+gtrans(qs1,mode="digraph",measure=c("strongcensus"))
 #
 ############Triad Restrictions############
 #
 # Regarding triads, Holland & Leinhardt (1971) list sixteen different types that are either transitive or intransitive. 
 # Each code represents, respectively, how many of each edge-type exist in a triad, 
 # with further modifiers added as necessary for direction. To analyze their presence in a graph, 
-# we can use the triad_census function in igraph. The function pulls a graph and outputs the number of triads 
-# in the graph in the order seen here (https://igraph.org/r/doc/triad_census.html). 
+# we can use the triad_census function in sna. The function pulls a graph and outputs the number of triads 
+# in the graph in the following order: 
 #
 # [003, 012, 102, 021D, 021U, 021C, 111D, 111U, 030T, 030C, 201, 120D, 120U, 120C, 210, and 300]
 #
-#To use this package, we’ll need to reload igraph.
+# Let’s try using this function on the first graph we generated, generating a new graph called graph2.
 #
-library(igraph)
+graph2 <- (rgraph(10, tprob = 0.3, mode = "digraph", return.as.edgelist = TRUE))
+g2 <- network(graph2)
+plot.network(g2)
 #
-# Next, let’s try using this function on the first graph we generated, graph1.
+# Then, we can use the triad.census function to examine all triad types.
 #
-graph1 <- sample_gnp(10, 0.3, directed = TRUE)
+triad.census(graph2)
 #
-# Then, we can use the triad_census function to examine all triad types.
+# Let’s also plot another random graph using rgraph. 
+# This time, let’s incorporate 50 nodes with a probability of .4. We’ll follow it up with triad.census.
 #
-# Let’s also plot another random graph using sample_gnp. 
-# This time, let’s incorporate 50 nodes with a probability of .4. We’ll follow it up with triad_census.
+graph3 <- (rgraph(50, tprob = 0.4, mode = "digraph", return.as.edgelist = TRUE))
+g3 <- network(graph3)
+plot.network(g3)
 #
-graph2 <- sample_gnp(50, 0.4, directed = TRUE)
-#
-triad_census(graph2)
+triad.census(graph3)
 #
 # It’s as simple as that. Now, let’s use a practical example to test a number of these techniques on.
 #
@@ -175,8 +174,7 @@ triad_census(graph2)
 # Since the original dataset contains so many nodes (and since generating a network on the full dataset takes at least 10 minutes on my computer), 
 # I have narrowed down the dataset to the first thirty user IDs in the edgelist and their adjacent followees.
 #
-# First, let's detatch igraph for data loading, then load in the data. We'll start with the edgelist.
-detach("package:igraph", unload = TRUE)
+# First, let's load in the data. We'll start with the edgelist.
 library(readr)
 EL <- read_csv("EL.csv", na = "empty")
 #
@@ -199,30 +197,23 @@ set.vertex.attribute(net,"Religion",Tag$Religion)
 set.seed(12345)
 plot(net,displaylabels=T,label.cex=.5,edge.col=rgb(150,150,150,100,maxColorValue=255))
 #
-# In order to check transitivity scores and run dyad and triad censuses, we need to bring igraph back in.
-#
-library(igraph)
-#
-# Let's start by converting the network to an igraph object.
-#
-inet <- asIgraph(net)
-#
 # Now, we can check transitivity of the entire network.
 #
-transitivity(inet)
+gtrans(net,mode="digraph",measure=c("weak"))
+gtrans(net,mode="digraph",measure=c("strong"))
+gtrans(net,mode="digraph",measure=c("weakcensus"))
+gtrans(net,mode="digraph",measure=c("strongcensus"))
 #
 # If the transitivity degree appears low, this is likely due to the sample selection.
-# We can also run a local transitivity function to examine specific transitivities.
-transitivity(inet, type = c(type = "local"))
-# As expected, the majority of transitivities in this network are fairly low.
+#
 # Visually, most edges look to be asymetrical. We can verify this with a dyad census.
 #
-dyad_census(inet)
+dyad.census(net)
 #
-# The dyad census output says this network has few M-edges, slightly more A-edges, and many N-edges. 
+# The dyad census output says this network has no M-edges, a decent number of A-edges, and many N-edges. 
 # A triad census could also tell us a little more about triad transitivity.
 #
-triad_census(inet)
+triad.census(net)
 #
 # The output states there are 3,728,011 empty graphs (003), 81,406 graphs with a single directed edge (012),
 # 7,492 out-star formations (021D), 205 in-star formations (021U), and 100 directed lines, which are intransitive by nature (021C).
